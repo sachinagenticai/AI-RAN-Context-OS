@@ -25,7 +25,15 @@ class AlarmGenerator(TelecomBaseGenerator[Alarm]):
     def __init__(self, seed: int | None = None, faker: Faker | None = None) -> None:
         super().__init__(seed=seed, faker=faker)
 
-    async def generate_one(self, scenario: object | None = None, affected_entity_type: str = "site", affected_entity_id: str | None = None) -> Alarm:
+    async def generate_one(
+        self,
+        scenario: object | None = None,
+        affected_entity_type: str = "site",
+        affected_entity_id: str | None = None,
+        site_id: str | None = None,
+        cell_id: str | None = None,
+        sector_id: str | None = None,
+    ) -> Alarm:
         title, description = self._faker.random_element(elements=list(self.ALARM_TITLES))
         severity = self._faker.random_element(elements=list(AlarmSeverity))
         entity_id = affected_entity_id or f"{affected_entity_type}-id"
@@ -36,6 +44,9 @@ class AlarmGenerator(TelecomBaseGenerator[Alarm]):
             severity=severity,
             affected_entity_type=affected_entity_type,
             affected_entity_id=entity_id,
+            site_id=site_id or "site-id",
+            cell_id=cell_id or "cell-id",
+            sector_id=sector_id or "sector-id",
         )
 
     async def generate_many(self, count: int = 1, affected_entity_type: str = "site", affected_entity_id: str | None = None) -> list[Alarm]:

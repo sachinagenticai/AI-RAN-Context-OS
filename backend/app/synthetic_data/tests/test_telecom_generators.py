@@ -19,6 +19,7 @@ from app.synthetic_data.models.telecom.enums import CarrierName, SectorId, Techn
 from app.synthetic_data.models.telecom.market import Market
 from app.synthetic_data.models.telecom.region import Region
 from app.synthetic_data.models.telecom.sector import Sector
+from app.synthetic_data.services.telecom_inventory_service import TelecomInventoryService
 
 
 def test_generators_create_related_inventory_models() -> None:
@@ -73,3 +74,40 @@ def test_generators_support_json_and_csv_export() -> None:
     assert '"name"' in json_payload
     assert 'region_id' not in csv_payload
     assert 'name' in csv_payload
+
+
+def test_cell_generator_uses_provided_cell_id_for_sectors() -> None:
+    cell_generator = CellGenerator(seed=11)
+
+    cell = asyncio.run(cell_generator.generate_one(site_id="site-42", cell_id="cell-42"))
+
+    assert cell.site_id == "site-42"
+    assert all(sector.cell_id == "cell-42" for sector in cell.sectors)
+
+
+def test_inventory_service_builds_related_inventory_hierarchy() -> None:
+    service = TelecomInventoryService()
+
+    inventory = asyncio.run(
+        service.generate_inventory(
+            region_count=1,
+            circles_per_region=1,
+            markets_per_circle=1,
+            clusters_per_market=1,
+            sites_per_cluster=1,
+            cells_per_site=1,
+        )
+    )
+
+    assert len(inventory["regions"]) == 1
+    assert len(inventory["circles"]) == 1
+    assert len(inventory["markets"]) == 1
+    assert len(inventory["clusters"]) == 1
+    assert len(inventory["sites"]) == 1
+    assert len(inventory["cells"]) == 1
+    assert len(inventory["cells"][0].sectors) == 3
+    assert inventory["circles"][0].region_id == str(inventory["regions"][0].id)
+    assert inventory["markets"][0].circle_id == str(inventory["circles"][0].id)
+    assert inventory["clusters"][0].market_id == str(inventory["markets"][0].id)
+    assert inventory["sites"][0].cluster == inventory["clusters"][0].name
+    assert inventory["cells"][0].site_id == inventory["sites"][0].site_id

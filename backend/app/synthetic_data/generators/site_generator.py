@@ -24,7 +24,13 @@ class SiteGenerator(BaseGenerator[SiteRecord]):
         count = max(int(scenario.count), 1)
         return [await self.generate_one(scenario) for _ in range(count)]
 
-    async def generate_one(self, scenario: SiteGenerationScenario) -> SiteRecord:
+    async def generate_one(
+        self,
+        scenario: SiteGenerationScenario | None = None,
+        region: str | None = None,
+        market: str | None = None,
+        cluster: str | None = None,
+    ) -> SiteRecord:
         return SiteRecord(
             site_id=self._build_site_id(),
             latitude=self._faker.latitude(),
@@ -33,9 +39,9 @@ class SiteGenerator(BaseGenerator[SiteRecord]):
             technology=self._faker.random_element(elements=["2G", "3G", "4G", "5G", "6G"]),
             power_source=self._faker.random_element(elements=["Grid", "Solar", "Generator", "Battery"]),
             status=self._faker.random_element(elements=["Active", "Standby", "Maintenance", "Planning"]),
-            region=self._faker.random_element(elements=["North America", "EMEA", "APAC", "LATAM"]),
-            market=self._faker.city(),
-            cluster=self._faker.random_element(elements=["Cluster-A", "Cluster-B", "Cluster-C", "Cluster-D"]),
+            region=region or self._faker.random_element(elements=["North America", "EMEA", "APAC", "LATAM"]),
+            market=market or self._faker.city(),
+            cluster=cluster or self._faker.random_element(elements=["Cluster-A", "Cluster-B", "Cluster-C", "Cluster-D"]),
         )
 
     def _build_site_id(self) -> str:

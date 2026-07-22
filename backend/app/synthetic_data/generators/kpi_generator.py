@@ -28,17 +28,30 @@ class KpiGenerator(TelecomBaseGenerator[KpiSeries]):
     def __init__(self, seed: int | None = None, faker: Faker | None = None) -> None:
         super().__init__(seed=seed, faker=faker)
 
-    async def generate_one(self, scenario: object | None = None, cell_id: str | None = None, interval: str = "hourly", points: int = 24) -> KpiSeries:
+    async def generate_one(
+        self,
+        scenario: object | None = None,
+        cell_id: str | None = None,
+        interval: str = "hourly",
+        points: int = 24,
+        site_id: str | None = None,
+        sector_id: str | None = None,
+        horizon: str | None = None,
+    ) -> KpiSeries:
         effective_cell_id = cell_id or "cell-id"
+        effective_site_id = site_id or "site-id"
+        effective_sector_id = sector_id or "sector-id"
+        effective_interval = interval or "hourly"
+        effective_horizon = horizon or "24h"
         base_time = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
 
-        if interval == "daily":
+        if effective_interval == "daily":
             base_time = base_time.replace(hour=0)
-        elif interval == "weekly":
+        elif effective_interval == "weekly":
             base_time = base_time - timedelta(days=base_time.weekday())
             base_time = base_time.replace(hour=0)
 
-        timestamps = [base_time + timedelta(hours=i) for i in range(points)] if interval == "hourly" else [base_time + timedelta(days=i) for i in range(points)] if interval == "daily" else [base_time + timedelta(days=i * 7) for i in range(points)]
+        timestamps = [base_time + timedelta(hours=i) for i in range(points)] if effective_interval == "hourly" else [base_time + timedelta(days=i) for i in range(points)] if effective_interval == "daily" else [base_time + timedelta(days=i * 7) for i in range(points)]
 
         metrics = [
             KpiMetric(
@@ -52,13 +65,33 @@ class KpiGenerator(TelecomBaseGenerator[KpiSeries]):
 
         return KpiSeries(
             cell_id=effective_cell_id,
-            interval=interval,
+            site_id=effective_site_id,
+            sector_id=effective_sector_id,
+            interval=effective_interval,
+            horizon=effective_horizon,
             timestamps=timestamps,
             metrics=metrics,
         )
 
     async def generate_many(self, cell_id: str, interval: str = "hourly", points: int = 24, count: int = 1) -> list[KpiSeries]:
         return [await self.generate_one(cell_id=cell_id, interval=interval, points=points) for _ in range(count)]
+
+    async def generate_series(
+        self,
+        site_id: str,
+        cell_id: str,
+        sector_id: str,
+        horizon: str = "24h",
+        points: int = 24,
+    ) -> KpiSeries:
+        return await self.generate_one(
+            cell_id=cell_id,
+            site_id=site_id,
+            sector_id=sector_id,
+            horizon=horizon,
+            points=points,
+            interval="hourly" if horizon == "24h" else "daily",
+        )
 
     def _generate_value(self, low: float, high: float) -> float:
         span = high - low
