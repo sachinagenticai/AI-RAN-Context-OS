@@ -1,0 +1,35 @@
+policies:
+  - id: policy-ops
+    name: Operational Safety Policy
+    version: v1
+    description: Governance for operational reasoning outcomes
+    category: Operational
+    enabled: true
+    rules:
+      - id: rule-high-risk
+        name: High risk recommendation guard
+        category: Safety
+        description: Reject high-risk recommendations without approval
+        severity: high
+        condition: risk_score >= 0.8
+        action: reject
+        approval_level: SUPERVISOR
+        risk_threshold: 0.8
+      - id: rule-unsafe-action
+        name: Unsafe action guard
+        category: Safety
+        description: Reject actions that would cause unsafe changes
+        severity: high
+        condition: action contains dispatch
+        action: reject
+        approval_level: ENGINEER
+        risk_threshold: 0.6
+      - id: rule-sla-breach
+        name: SLA breach protection
+        category: SLA
+        description: Require manager review for SLA breach risks
+        severity: medium
+        condition: sla_violation_risk == High
+        action: human_approval
+        approval_level: MANAGER
+        risk_threshold: 0.7
