@@ -46,7 +46,7 @@ import type {
 } from "../types/domain";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1",
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? "",
   timeout: 8000
 });
 
@@ -461,7 +461,7 @@ const mapTimeline = (payload: ContextIntelligenceResponse["timeline"]) => [
 ];
 
 const getContextSearch = async (): Promise<ContextSearchResponse> => {
-  const response = await api.get<ContextSearchResponse>("/context/search", {
+  const response = await api.get<ContextSearchResponse>("/api/v1/context/search", {
     params: { page: 1, page_size: 20 }
   });
 
@@ -469,7 +469,7 @@ const getContextSearch = async (): Promise<ContextSearchResponse> => {
 };
 
 const getContextIntelligence = async (entityId: string, entityType: string): Promise<ContextIntelligenceResponse> => {
-  const response = await api.get<ContextIntelligenceResponse>("/context/intelligence", {
+  const response = await api.get<ContextIntelligenceResponse>("/api/v1/context/intelligence", {
     params: { entity_id: entityId, entity_type: entityType }
   });
 
@@ -477,7 +477,7 @@ const getContextIntelligence = async (entityId: string, entityType: string): Pro
 };
 
 const getContextSection = async (
-  endpoint: "/context/evidence" | "/context/timeline" | "/context/business-impact" | "/context/quality",
+  endpoint: "/api/v1/context/evidence" | "/api/v1/context/timeline" | "/api/v1/context/business-impact" | "/api/v1/context/quality",
   entityId: string,
   entityType: string
 ): Promise<ContextIntelligenceResponse> => {
@@ -570,7 +570,7 @@ const CONNECTOR_HUB_TARGETS: Array<{ name: string; aliases: string[]; defaultSer
   { name: "NETCONF", aliases: ["netconf"], defaultServices: ["Config Push", "State Retrieval"], defaultApis: ["NETCONF", "YANG"] },
   { name: "Database", aliases: ["database", "db", "sql", "postgres", "mysql"], defaultServices: ["State Store", "Audit Persistence"], defaultApis: ["SQL", "JDBC"] },
   { name: "Vector DB", aliases: ["vector", "embedding", "vectordb"], defaultServices: ["Embedding Index", "Similarity Search"], defaultApis: ["Vector Search", "REST"] },
-  { name: "Enterprise Memory", aliases: ["memory", "knowledge"], defaultServices: ["Memory Summary", "Memory History"], defaultApis: ["/memory/summary", "/memory/history"] },
+  { name: "Enterprise Memory", aliases: ["memory", "knowledge"], defaultServices: ["Memory Summary", "Memory History"], defaultApis: ["/api/v1/memory/summary", "/api/v1/memory/history"] },
   { name: "LLM Gateway", aliases: ["llm", "model", "gateway", "inference"], defaultServices: ["Prompt Routing", "Model Invocation"], defaultApis: ["REST", "gRPC"] }
 ];
 
@@ -660,12 +660,12 @@ export const login = async (username: string, password: string): Promise<string>
 export const getDashboardSnapshot = async (): Promise<DashboardSnapshot> => {
   const [search, health, connectors, modules, policy, modelTypes] = await Promise.all([
     getContextSearch(),
-    api.get<HealthStatus>("/health"),
-    api.get<ConnectorHealth[]>("/connectors/health"),
-    api.get<KernelModuleInfo[]>("/kernel/modules"),
-    api.get<PolicyVersionResponse>("/policy"),
-    api.get<string[]>("/models/types"),
-    api.get<MemorySummaryResponse>("/memory/summary", {
+    api.get<HealthStatus>("/api/v1/health"),
+    api.get<ConnectorHealth[]>("/api/v1/connectors/health"),
+    api.get<KernelModuleInfo[]>("/api/v1/kernel/modules"),
+    api.get<PolicyVersionResponse>("/api/v1/policy"),
+    api.get<string[]>("/api/v1/models/types"),
+    api.get<MemorySummaryResponse>("/api/v1/memory/summary", {
       params: { entity_id: DEFAULT_ENTITY_ID, entity_type: DEFAULT_ENTITY_TYPE }
     })
   ]);
@@ -690,7 +690,7 @@ export const getDashboardSnapshot = async (): Promise<DashboardSnapshot> => {
   };
 
   const intelligence = await getContextIntelligence(leadIncident.id, DEFAULT_ENTITY_TYPE);
-  const reasoning = await api.post<ReasoningResponse>("/reasoning/analyze", {
+  const reasoning = await api.post<ReasoningResponse>("/api/v1/reasoning/analyze", {
     entity_id: leadIncident.id,
     entity_type: DEFAULT_ENTITY_TYPE,
     context: intelligence.context,
@@ -917,8 +917,8 @@ export const runInvestigationOrchestrator = async (
     "kpi-analysis-agent",
     "KPI Analysis Agent is evaluating business impact and quality across live KPI signals",
     async () => {
-      const businessImpact = await getContextSection("/context/business-impact", item.id, DEFAULT_ENTITY_TYPE);
-      const quality = await getContextSection("/context/quality", item.id, DEFAULT_ENTITY_TYPE);
+      const businessImpact = await getContextSection("/api/v1/context/business-impact", item.id, DEFAULT_ENTITY_TYPE);
+      const quality = await getContextSection("/api/v1/context/quality", item.id, DEFAULT_ENTITY_TYPE);
       return { businessImpact, quality };
     },
     (result) => {
@@ -942,7 +942,7 @@ export const runInvestigationOrchestrator = async (
   const topologyPayload = await runInvestigationStep(
     "topology-agent",
     "Topology Agent is reconstructing timeline and cross-domain topology state",
-    () => getContextSection("/context/timeline", item.id, DEFAULT_ENTITY_TYPE),
+    () => getContextSection("/api/v1/context/timeline", item.id, DEFAULT_ENTITY_TYPE),
     (result) => {
       sharedContext.topologyAssessment = `Topology Agent mapped ${result.timeline.current.state} current state and ${result.timeline.predicted_future.state} future state for the incident domain.`;
       sharedContext.artifacts["topology-agent"] = formatArtifacts(
@@ -963,8 +963,8 @@ export const runInvestigationOrchestrator = async (
     "root-cause-agent",
     "Root Cause Agent is loading evidence and executing causal reasoning",
     async () => {
-      const evidence = await getContextSection("/context/evidence", item.id, DEFAULT_ENTITY_TYPE);
-      const reasoning = await api.post<ReasoningResponse>("/reasoning/analyze", {
+      const evidence = await getContextSection("/api/v1/context/evidence", item.id, DEFAULT_ENTITY_TYPE);
+      const reasoning = await api.post<ReasoningResponse>("/api/v1/reasoning/analyze", {
         entity_id: item.id,
         entity_type: DEFAULT_ENTITY_TYPE,
         context: intelligence.context,
@@ -998,7 +998,7 @@ export const runInvestigationOrchestrator = async (
     "policy-agent",
     "Policy Agent is evaluating guardrails for the proposed remediation",
     () =>
-      api.post<PolicyEvaluationResponse>("/policy/evaluate", {
+      api.post<PolicyEvaluationResponse>("/api/v1/policy/evaluate", {
         recommended_action: rootCausePayload.reasoning.data.decision.recommended_action,
         risk_score: policyRiskFromLabels(
           kpiAgentPayload.businessImpact.business_impact.risk,
@@ -1029,7 +1029,7 @@ export const runInvestigationOrchestrator = async (
     "enterprise-memory-agent",
     "Enterprise Memory Agent is loading operational memory and historical precedent",
     () =>
-      api.get<MemorySummaryResponse>("/memory/summary", {
+      api.get<MemorySummaryResponse>("/api/v1/memory/summary", {
         params: { entity_id: item.id, entity_type: DEFAULT_ENTITY_TYPE }
       }),
     (result) => {
@@ -1170,14 +1170,14 @@ export const getReportsSnapshot = async (): Promise<ReportsSnapshot> => {
   const entityId = search.items[0]?.id ?? DEFAULT_ENTITY_ID;
 
   const [health, kernelHealth, modules, policy, modelTypes, connectors, connectorHealth, memory] = await Promise.all([
-    api.get<HealthStatus>("/health"),
-    api.get<KernelHealth>("/kernel/health"),
-    api.get<KernelModuleInfo[]>("/kernel/modules"),
-    api.get<PolicyVersionResponse>("/policy"),
-    api.get<string[]>("/models/types"),
-    api.get<ConnectorRecord[]>("/connectors"),
-    api.get<ConnectorHealth[]>("/connectors/health"),
-    api.get<MemorySummaryResponse>("/memory/summary", {
+    api.get<HealthStatus>("/api/v1/health"),
+    api.get<KernelHealth>("/api/v1/kernel/health"),
+    api.get<KernelModuleInfo[]>("/api/v1/kernel/modules"),
+    api.get<PolicyVersionResponse>("/api/v1/policy"),
+    api.get<string[]>("/api/v1/models/types"),
+    api.get<ConnectorRecord[]>("/api/v1/connectors"),
+    api.get<ConnectorHealth[]>("/api/v1/connectors/health"),
+    api.get<MemorySummaryResponse>("/api/v1/memory/summary", {
       params: { entity_id: entityId, entity_type: DEFAULT_ENTITY_TYPE }
     })
   ]);
@@ -1245,7 +1245,7 @@ export const getControlTowerSnapshot = async (): Promise<ControlTowerSnapshot> =
 
   const modelsRequest = (async (): Promise<{ data: string[]; latencyMs: number }> => {
     const started = performance.now();
-    const response = await api.get<string[]>("/models/types");
+    const response = await api.get<string[]>("/api/v1/models/types");
     return { data: response.data, latencyMs: Math.max(1, Math.round(performance.now() - started)) };
   })();
 
@@ -1261,17 +1261,17 @@ export const getControlTowerSnapshot = async (): Promise<ControlTowerSnapshot> =
     memoryHistory,
     modelSnapshot
   ] = await Promise.all([
-    api.get<HealthStatus>("/health"),
-    api.get<KernelHealth>("/kernel/health"),
-    api.get<KernelModuleInfo[]>("/kernel/modules"),
-    api.get<ConnectorRecord[]>("/connectors"),
-    api.get<ConnectorHealth[]>("/connectors/health"),
-    api.get<Record<string, unknown>>("/events/metrics"),
-    api.get<Record<string, unknown>>("/events/status"),
-    api.get<MemorySummaryResponse>("/memory/summary", {
+    api.get<HealthStatus>("/api/v1/health"),
+    api.get<KernelHealth>("/api/v1/kernel/health"),
+    api.get<KernelModuleInfo[]>("/api/v1/kernel/modules"),
+    api.get<ConnectorRecord[]>("/api/v1/connectors"),
+    api.get<ConnectorHealth[]>("/api/v1/connectors/health"),
+    api.get<Record<string, unknown>>("/api/v1/events/metrics"),
+    api.get<Record<string, unknown>>("/api/v1/events/status"),
+    api.get<MemorySummaryResponse>("/api/v1/memory/summary", {
       params: { entity_id: leadEntityId, entity_type: DEFAULT_ENTITY_TYPE }
     }),
-    api.get<MemoryHistoryEntry[]>("/memory/history", {
+    api.get<MemoryHistoryEntry[]>("/api/v1/memory/history", {
       params: { entity_id: leadEntityId, entity_type: DEFAULT_ENTITY_TYPE }
     }),
     modelsRequest
@@ -1464,19 +1464,19 @@ export const getControlTowerSnapshot = async (): Promise<ControlTowerSnapshot> =
 export const getConnectorHubSnapshot = async (): Promise<ConnectorHubSnapshot> => {
   const [recordsResponse, healthResponse, statusResponse, discovery, capabilities, eventsMetrics, eventsStatus] =
     await Promise.all([
-      api.get<ConnectorRecord[]>("/connectors"),
-      api.get<ConnectorHealth[]>("/connectors/health"),
-      api.get<ConnectorRuntimeStatus[]>("/connectors/status"),
+      api.get<ConnectorRecord[]>("/api/v1/connectors"),
+      api.get<ConnectorHealth[]>("/api/v1/connectors/health"),
+      api.get<ConnectorRuntimeStatus[]>("/api/v1/connectors/status"),
       api
-        .get<ConnectorDiscoveryResponse>("/connectors/discover")
+        .get<ConnectorDiscoveryResponse>("/api/v1/connectors/discover")
         .then((response) => response.data)
         .catch(() => ({ registered_connectors: [], available_connectors: [], transformation_profiles: [] })),
       api
-        .get<ConnectorCapabilityCatalog>("/connectors/capabilities")
+        .get<ConnectorCapabilityCatalog>("/api/v1/connectors/capabilities")
         .then((response) => response.data)
         .catch(() => ({ connectors: {}, available_types: {} })),
-      api.get<Record<string, unknown>>("/events/metrics").then((response) => response.data).catch(() => ({})),
-      api.get<Record<string, unknown>>("/events/status").then((response) => response.data).catch(() => ({}))
+      api.get<Record<string, unknown>>("/api/v1/events/metrics").then((response) => response.data).catch(() => ({})),
+      api.get<Record<string, unknown>>("/api/v1/events/status").then((response) => response.data).catch(() => ({}))
     ]);
 
   const records = recordsResponse.data;
@@ -1485,7 +1485,7 @@ export const getConnectorHubSnapshot = async (): Promise<ConnectorHubSnapshot> =
 
   const detailsSettled = await Promise.allSettled(
     records.map(async (record) => {
-      const response = await api.get<ConnectorDetailResponse>(`/connectors/${record.metadata.connector_id}`);
+      const response = await api.get<ConnectorDetailResponse>(`/api/v1/connectors/${record.metadata.connector_id}`);
       return response.data;
     })
   );
@@ -1658,7 +1658,7 @@ export const getConnectorHubSnapshot = async (): Promise<ConnectorHubSnapshot> =
 };
 
 export const testConnectorConnection = async (connectorId: string): Promise<ConnectorConnectionTestResult> => {
-  const response = await api.get<ConnectorHealth[]>("/connectors/health", {
+  const response = await api.get<ConnectorHealth[]>("/api/v1/connectors/health", {
     params: { connector_id: connectorId }
   });
 
@@ -1682,7 +1682,7 @@ export const getExplainabilitySnapshot = async (incidentId: string): Promise<Exp
 
   const [search, historyResponse] = await Promise.all([
     getContextSearch(),
-    api.get<MemoryHistoryEntry[]>("/memory/history", {
+    api.get<MemoryHistoryEntry[]>("/api/v1/memory/history", {
       params: { entity_id: bundle.incident.id, entity_type: DEFAULT_ENTITY_TYPE }
     })
   ]);
@@ -1806,7 +1806,7 @@ export const getExecutiveReportSnapshot = async (incidentId: string): Promise<Ex
 
   const [dashboard, eventsMetrics] = await Promise.all([
     getDashboardSnapshot(),
-    api.get<Record<string, unknown>>("/events/metrics")
+    api.get<Record<string, unknown>>("/api/v1/events/metrics")
   ]);
 
   const availabilityBefore = Number(dashboard.networkAvailability.value.replace("%", "")) || 96;
@@ -1888,10 +1888,10 @@ export const getEnterpriseMemoryCenterSnapshot = async (): Promise<EnterpriseMem
   const entityId = leadIncident?.id ?? DEFAULT_ENTITY_ID;
 
   const [summary, historyResponse] = await Promise.all([
-    api.get<MemorySummaryResponse>("/memory/summary", {
+    api.get<MemorySummaryResponse>("/api/v1/memory/summary", {
       params: { entity_id: entityId, entity_type: DEFAULT_ENTITY_TYPE }
     }),
-    api.get<MemoryHistoryEntry[]>("/memory/history", {
+    api.get<MemoryHistoryEntry[]>("/api/v1/memory/history", {
       params: { entity_id: entityId, entity_type: DEFAULT_ENTITY_TYPE }
     })
   ]);
@@ -2094,7 +2094,7 @@ export const getKnowledgeGraphSnapshot = async (): Promise<KnowledgeGraphSnapsho
       }
 
       const intel = await getContextIntelligence(lead.id, DEFAULT_ENTITY_TYPE);
-      const response = await api.post<ReasoningResponse>("/reasoning/analyze", {
+      const response = await api.post<ReasoningResponse>("/api/v1/reasoning/analyze", {
         entity_id: lead.id,
         entity_type: DEFAULT_ENTITY_TYPE,
         context: intel.context,
@@ -2107,8 +2107,8 @@ export const getKnowledgeGraphSnapshot = async (): Promise<KnowledgeGraphSnapsho
 
       return response.data;
     })(),
-    api.get<PolicyVersionResponse>("/policy"),
-    api.get<MemorySummaryResponse>("/memory/summary", {
+    api.get<PolicyVersionResponse>("/api/v1/policy"),
+    api.get<MemorySummaryResponse>("/api/v1/memory/summary", {
       params: { entity_id: entityId, entity_type: DEFAULT_ENTITY_TYPE }
     })
   ]);

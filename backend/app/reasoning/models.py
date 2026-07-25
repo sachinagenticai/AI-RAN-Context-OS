@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -65,3 +65,9 @@ class ReasoningResponse(BaseModel):
     prediction: PredictionResult
     decision: ReasoningDecision
     confidence: float = Field(ge=0.0, le=1.0)
+    
+    # Optional LLM-enriched fields (populated by OpenAI if available)
+    llm_executive_summary: Optional[str] = None
+    llm_root_cause_summary: Optional[str] = None
+    llm_recommended_actions: Optional[list[str]] = None
+    llm_risk_assessment: Optional[str] = None
